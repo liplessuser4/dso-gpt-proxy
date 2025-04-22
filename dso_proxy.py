@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from artikel_linker import link_artikelen
 import requests
 import os
 
