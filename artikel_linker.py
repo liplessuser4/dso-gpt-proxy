@@ -2,10 +2,10 @@
 import re
 
 BESLUIT_URLS = {
-    "Ow": "BWBR0037885",     # Omgevingswet
-    "Bal": "BWBR0041330",    # Besluit activiteiten leefomgeving
-    "Bbl": "BWBR0041297",    # Besluit bouwwerken leefomgeving
-    "Bkl": "BWBR0041313",    # Besluit kwaliteit leefomgeving
+    "Ow": "https://wetten.overheid.nl/BWBR0037885/2024-01-01",
+    "Bal": "https://wetten.overheid.nl/BWBR0041330/2025-01-01",
+    "Bbl": "https://wetten.overheid.nl/BWBR0041297/2025-01-01",
+    "Bkl": "https://wetten.overheid.nl/BWBR0041313/2024-01-01",
 }
 
 def link_artikelen(text):
@@ -14,7 +14,6 @@ def link_artikelen(text):
         besluit = match.group(2)
         besluit_code = BESLUIT_URLS.get(besluit)
         if besluit_code:
-            url = f"https://wetten.overheid.nl/jci1.3:{besluit_code}&z=2024-01-01&g=2024-01-01"
             return f"[art. {artikel} {besluit}]({url})"
         return match.group(0)
     
