@@ -2,10 +2,10 @@
 import re
 
 BESLUIT_URLS = {
-    "Ow": "BWBR0042081",     # Omgevingswet
-    "Bal": "BWBR0042086",    # Besluit activiteiten leefomgeving
-    "Bbl": "BWBR0042090",    # Besluit bouwwerken leefomgeving
-    "Bkl": "BWBR0042094",    # Besluit kwaliteit leefomgeving
+    "Ow": "BWBR0037885",     # Omgevingswet
+    "Bal": "BWBR0041330",    # Besluit activiteiten leefomgeving
+    "Bbl": "BWBR0041297",    # Besluit bouwwerken leefomgeving
+    "Bkl": "BWBR0041313",    # Besluit kwaliteit leefomgeving
 }
 
 def link_artikelen(text):
