@@ -109,7 +109,61 @@ def locatiehulp():
     except requests.exceptions.RequestException as e:
         return jsonify({"error": str(e)}), 500
 
+# 6️⃣ STTR vragenboom ophalen en omzetten naar JSON
+@app.route("/dso/sttr", methods=["POST"])
+def sttr_vragenboom():
+    data = request.json
+    activiteit_id = data.get("activiteit_id")
+
+    if not activiteit_id:
+        return jsonify({"error": "activiteit_id is verplicht"}), 400
+
+    try:
+        response = requests.get(
+            "https://api.pre.omgevingswet.overheid.nl/v1/toepasbare-regels",
+            headers=HEADERS,
+            params={"activiteitId": activiteit_id}
+        )
+
+        if response.status_code != 200:
+            return jsonify({"error": "Kon STTR-bestand niet ophalen"}), 500
+
+        xml_data = response.text
+        try:
+            json_data = xmltodict.parse(xml_data)
+            return jsonify({"sttr": json_data})
+        except Exception as parse_error:
+            return jsonify({
+                "xml": xml_data,
+                "waarschuwing": "XML kon niet omgezet worden naar JSON",
+                "fout": str(parse_error)
+            })
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": str(e)}), 500
+
+# 7️⃣ RTR Gegevens raadplegen: Activiteiten en Werkzaamheden
+@app.route("/dso/rtr/activiteiten", methods=["GET"])
+def rtr_activiteiten():
+    try:
+        response = requests.get(
+            "https://service.pre.omgevingswet.overheid.nl/publiek/toepasbare-regels/api/rtrgegevens/v2/activiteiten",
+            headers={"x-api-key": DSO_API_KEY}
+        )
+        return jsonify(response.json())
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/dso/rtr/werkzaamheden", methods=["GET"])
+def rtr_werkzaamheden():
+    try:
+        response = requests.get(
+            "https://service.pre.omgevingswet.overheid.nl/publiek/toepasbare-regels/api/rtrgegevens/v2/werkzaamheden",
+            headers={"x-api-key": DSO_API_KEY}
+        )
+        return jsonify(response.json())
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": str(e)}), 500
+
 # ✅ Start de app
 if __name__ == "__main__":
     app.run(debug=True, port=8080)
-
