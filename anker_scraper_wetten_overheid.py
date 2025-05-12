@@ -1,4 +1,3 @@
-# Dit is de scraper die je al van mij kreeg
 from bs4 import BeautifulSoup
 import requests
 import json
