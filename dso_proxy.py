@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 import requests
 import os
+import xmltodict
 
 app = Flask(__name__)
 
@@ -163,6 +164,21 @@ def rtr_werkzaamheden():
         return jsonify(response.json())
     except requests.exceptions.RequestException as e:
         return jsonify({"error": str(e)}), 500
+
+# 8️⃣ Init route om STTR- en RTR-gegevens in één keer op te halen
+@app.route("/dso/init", methods=["POST"])
+def dso_init():
+    """Combineer STTR en RTR gegevens in een enkele respons."""
+    sttr_response = sttr_vragenboom()
+    rtr_act_response = rtr_activiteiten()
+    rtr_work_response = rtr_werkzaamheden()
+
+    combined = {
+        "sttr": sttr_response.get_json(),
+        "rtr_activiteiten": rtr_act_response.get_json(),
+        "rtr_werkzaamheden": rtr_work_response.get_json(),
+    }
+    return jsonify(combined)
 
 # ✅ Start de app
 if __name__ == "__main__":
