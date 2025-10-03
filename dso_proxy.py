@@ -3,13 +3,13 @@ import requests
 import os
 import xmltodict
 
-# ✅ Maak de app
+# Maak de app
 app = Flask(__name__)
 
-# 🔑 API key uit Render environment variables
+# API key uit Render environment variables
 DSO_API_KEY = os.environ.get("DSO_API_KEY", "234d24da-aa7b-4007-b512-8c077d2e1acc")
 
-# ✅ Basis headers
+# Basis headers
 HEADERS = {
     "x-api-key": DSO_API_KEY,
     "Accept": "application/hal+json"
@@ -207,6 +207,6 @@ def dso_assist():
         return jsonify({"error": str(e)}), 500
 
 
-# ✅ Start lokaal (Render gebruikt gunicorn)
+# Start lokaal (Render gebruikt gunicorn)
 if __name__ == "__main__":
     app.run(debug=True, port=8080)
