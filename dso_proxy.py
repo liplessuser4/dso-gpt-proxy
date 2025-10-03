@@ -37,7 +37,7 @@ def rtr_activiteiten():
     params = {"zoekterm": zoekterm, "datum": datum}
 
     try:
-        resp = requests.get(f"{BASE_URL}/rtrgegevens/v2/activiteiten/_zoek",
+        resp = requests.get(f"{BASE_URL}/rtrgegevens/v2/activiteiten",
                             headers=HEADERS, params=params)
         return jsonify(resp.json())
     except Exception as e:
