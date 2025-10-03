@@ -7,7 +7,7 @@ import xmltodict
 app = Flask(__name__)
 
 # 🔑 API key uit Render environment variables
-DSO_API_KEY = os.environ.get("DSO_API_KEY", "VUL_HIER_JE_KEY_IN")
+DSO_API_KEY = os.environ.get("DSO_API_KEY", "234d24da-aa7b-4007-b512-8c077d2e1acc")
 
 # ✅ Basis headers
 HEADERS = {
