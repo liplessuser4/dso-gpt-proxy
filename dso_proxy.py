@@ -1,184 +1,79 @@
-from flask import Flask, request, jsonify
-import requests
-import os
-import xmltodict
-
-app = Flask(__name__)
-
-# Zet hier je DSO API key (of gebruik Render environment variable)
-DSO_API_KEY = os.environ.get("DSO_API_KEY", "234d24da-aa7b-4007-b512-8c077d2e1acc")
-
-HEADERS = {
-    "Authorization": f"Bearer {DSO_API_KEY}",
-    "Accept": "application/json"
-}
-
-# 1️⃣ Regels op de kaart / Vergunningcheck
-@app.route("/dso/vergunningcheck", methods=["POST"])
-def vergunningcheck():
+@app.route("/dso/assist", methods=["POST"])
+def dso_assist():
+    """
+    Slimme assistent: gebruiker geeft vrije tekst ('Ik wil een dakkapel plaatsen op Oudegracht 200, Utrecht')
+    Proxy doet alles: locatiehulp -> RTR -> STTR -> vergunningcheck -> indieningsvereisten
+    """
     data = request.json
-    locatie = data.get("locatie")
-    activiteit = data.get("activiteit")
+    vraag = data.get("vraag")
 
-    if not locatie or not activiteit:
-        return jsonify({"error": "locatie en activiteit zijn verplicht"}), 400
+    if not vraag:
+        return jsonify({"error": "Geef een vraag mee"}), 400
 
     try:
-        response = requests.get(
-            "https://api.pre.omgevingswet.overheid.nl/v1/regels",
-            headers=HEADERS,
-            params={"locatie": locatie, "activiteit": activiteit}
-        )
-        return jsonify(response.json())
-    except requests.exceptions.RequestException as e:
-        return jsonify({"error": str(e)}), 500
+        # ⚡️ 1. (Demo) simpele extractie: activiteit + adres
+        # TODO: hier kun je NLP toevoegen voor betere parsing
+        activiteit_zoekterm = "dakkapel"  
+        adres = "Oudegracht 200, Utrecht"
 
-# 2️⃣ Bevoegd gezag
-@app.route("/dso/bevoegdgezag", methods=["POST"])
-def bevoegd_gezag():
-    data = request.json
-    locatie = data.get("locatie")
-    activiteit = data.get("activiteit")
-
-    if not locatie or not activiteit:
-        return jsonify({"error": "locatie en activiteit zijn verplicht"}), 400
-
-    try:
-        response = requests.get(
-            "https://api.pre.omgevingswet.overheid.nl/v1/bevoegdgezag",
-            headers=HEADERS,
-            params={"locatie": locatie, "activiteit": activiteit}
-        )
-        return jsonify(response.json())
-    except requests.exceptions.RequestException as e:
-        return jsonify({"error": str(e)}), 500
-
-# 3️⃣ Indieningsvereisten
-@app.route("/dso/indieningsvereisten", methods=["POST"])
-def indieningsvereisten():
-    data = request.json
-    activiteit = data.get("activiteit")
-
-    if not activiteit:
-        return jsonify({"error": "activiteit is verplicht"}), 400
-
-    try:
-        response = requests.get(
-            "https://api.pre.omgevingswet.overheid.nl/v1/formulieren/aanvraagvereisten",
-            headers=HEADERS,
-            params={"activiteit": activiteit}
-        )
-        return jsonify(response.json())
-    except requests.exceptions.RequestException as e:
-        return jsonify({"error": str(e)}), 500
-
-# 4️⃣ Activiteitenzoeker
-@app.route("/dso/activiteitenzoeker", methods=["POST"])
-def activiteitenzoeker():
-    data = request.json
-    zoekterm = data.get("zoekterm")
-
-    if not zoekterm:
-        return jsonify({"error": "zoekterm is verplicht"}), 400
-
-    try:
-        response = requests.get(
-            "https://api.pre.omgevingswet.overheid.nl/v1/activiteiten",
-            headers=HEADERS,
-            params={"zoekterm": zoekterm}
-        )
-        return jsonify(response.json())
-    except requests.exceptions.RequestException as e:
-        return jsonify({"error": str(e)}), 500
-
-# 5️⃣ Locatiehulp
-@app.route("/dso/locatiehulp", methods=["POST"])
-def locatiehulp():
-    data = request.json
-    adres = data.get("adres")
-
-    if not adres:
-        return jsonify({"error": "adres is verplicht"}), 400
-
-    try:
-        response = requests.get(
-            "https://api.pre.omgevingswet.overheid.nl/v1/locaties",
-            headers=HEADERS,
+        # ⚡️ 2. Locatiehulp (adres → RD-coördinaten)
+        loc_resp = requests.get(
+            "https://service.pre.omgevingswet.overheid.nl/publiek/bepalen-locatie/api/locaties",
+            headers={"x-api-key": DSO_API_KEY, "Accept": "application/hal+json"},
             params={"adres": adres}
         )
-        return jsonify(response.json())
-    except requests.exceptions.RequestException as e:
-        return jsonify({"error": str(e)}), 500
+        loc_json = loc_resp.json()
+        if not loc_json.get("features"):
+            return jsonify({"error": "Geen locatie gevonden"}), 404
+        coords = loc_json["features"][0]["geometry"]["coordinates"]  # RD (EPSG:28992)
 
-# 6️⃣ STTR vragenboom ophalen en omzetten naar JSON
-@app.route("/dso/sttr", methods=["POST"])
-def sttr_vragenboom():
-    data = request.json
-    activiteit_id = data.get("activiteit_id")
-
-    if not activiteit_id:
-        return jsonify({"error": "activiteit_id is verplicht"}), 400
-
-    try:
-        response = requests.get(
-            "https://api.pre.omgevingswet.overheid.nl/v1/toepasbare-regels",
+        # ⚡️ 3. RTR → zoek activiteit
+        act_resp = requests.get(
+            f"{BASE_URL}/rtrgegevens/v2/activiteiten/_zoek",
             headers=HEADERS,
-            params={"activiteitId": activiteit_id}
+            params={"zoekterm": activiteit_zoekterm, "datum": "01-01-2025"}
         )
+        act_json = act_resp.json()
+        if not act_json.get("_embedded"):
+            return jsonify({"error": "Geen activiteit gevonden"}), 404
+        functioneleStructuurRef = act_json["_embedded"]["activiteiten"][0]["identificatie"]
 
-        if response.status_code != 200:
-            return jsonify({"error": "Kon STTR-bestand niet ophalen"}), 500
-
-        xml_data = response.text
+        # ⚡️ 4. STTR ophalen (XML → JSON)
+        sttr_url = f"{BASE_URL}/toepasbareregelsuitvoerengegevens/v1/{functioneleStructuurRef}"
+        sttr_resp = requests.get(sttr_url, headers={**HEADERS, "Accept": "application/xml"})
+        sttr_xml = sttr_resp.text
         try:
-            json_data = xmltodict.parse(xml_data)
-            return jsonify({"sttr": json_data})
-        except Exception as parse_error:
-            return jsonify({
-                "xml": xml_data,
-                "waarschuwing": "XML kon niet omgezet worden naar JSON",
-                "fout": str(parse_error)
-            })
-    except requests.exceptions.RequestException as e:
-        return jsonify({"error": str(e)}), 500
+            sttr_json = xmltodict.parse(sttr_xml)
+        except Exception:
+            sttr_json = {"raw_xml": sttr_xml}
 
-# 7️⃣ RTR Gegevens raadplegen: Activiteiten en Werkzaamheden
-@app.route("/dso/rtr/activiteiten", methods=["GET"])
-def rtr_activiteiten():
-    try:
-        response = requests.get(
-            "https://service.pre.omgevingswet.overheid.nl/publiek/toepasbare-regels/api/rtrgegevens/v2/activiteiten",
-            headers={"x-api-key": DSO_API_KEY}
-        )
-        return jsonify(response.json())
-    except requests.exceptions.RequestException as e:
-        return jsonify({"error": str(e)}), 500
+        # ⚡️ 5. Vergunningcheck (conclusie)
+        body = {
+            "functioneleStructuurRefs": [
+                {"functioneleStructuurRef": functioneleStructuurRef, "antwoorden": []}
+            ],
+            "_geo": {"intersects": {"type": "Point", "coordinates": coords}}
+        }
+        check_url = f"{BASE_URL}/toepasbareregelsuitvoerenservices/v3/conclusie/_bepaal"
+        check_resp = requests.post(check_url, json=body,
+                                   headers={**HEADERS, "Content-Crs": "EPSG:28992"})
 
-@app.route("/dso/rtr/werkzaamheden", methods=["GET"])
-def rtr_werkzaamheden():
-    try:
-        response = requests.get(
-            "https://service.pre.omgevingswet.overheid.nl/publiek/toepasbare-regels/api/rtrgegevens/v2/werkzaamheden",
-            headers={"x-api-key": DSO_API_KEY}
-        )
-        return jsonify(response.json())
-    except requests.exceptions.RequestException as e:
-        return jsonify({"error": str(e)}), 500
-# 8️⃣ Init route om STTR- en RTR-gegevens in één keer op te halen
-@app.route("/dso/init", methods=["POST"])
-def dso_init():
-    """Combineer STTR en RTR gegevens in een enkele respons."""
-    sttr_response = sttr_vragenboom()
-    rtr_act_response = rtr_activiteiten()
-    rtr_work_response = rtr_werkzaamheden()
+        # ⚡️ 6. Indieningsvereisten
+        req_url = f"{BASE_URL}/toepasbareregelsuitvoerenservices/v3/indieningsvereisten/_bepaal"
+        req_resp = requests.post(req_url, json=body,
+                                 headers={**HEADERS, "Content-Crs": "EPSG:28992"})
 
-    combined = {
-        "sttr": sttr_response.get_json(),
-        "rtr_activiteiten": rtr_act_response.get_json(),
-        "rtr_werkzaamheden": rtr_work_response.get_json(),
-    }
-    return jsonify(combined)
-      
-# ✅ Start de app
-if __name__ == "__main__":
-    app.run(debug=True, port=8080)
+        # ⚡️ 7. Alles combineren
+        return jsonify({
+            "input_vraag": vraag,
+            "adres": adres,
+            "coords_rd": coords,
+            "activiteit": activiteit_zoekterm,
+            "functioneleStructuurRef": functioneleStructuurRef,
+            "sttr": sttr_json,
+            "vergunningcheck": check_resp.json(),
+            "indieningsvereisten": req_resp.json()
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
