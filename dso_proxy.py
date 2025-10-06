@@ -145,6 +145,19 @@ def indieningsvereisten() -> tuple[object, int]:
     except requests.exceptions.RequestException as exc:
         return jsonify({"error": str(exc)}), 500
 
+@app.after_request
+def add_debug_header(response):
+    """
+    Voeg de JSON-body toe aan een X-Debug-Return header
+    """
+    try:
+        # Alleen voor JSON responses
+        if response.is_json:
+            response.headers["X-Debug-Return"] = str(response.get_json())[:2000]  # beperkt tot 2000 tekens
+    except Exception as e:
+        response.headers["X-Debug-Return"] = f"debug-error: {e}"
+    return response
+    
 if __name__ == "__main__":
     port_str = os.environ.get("PORT", "8080")
     try:
